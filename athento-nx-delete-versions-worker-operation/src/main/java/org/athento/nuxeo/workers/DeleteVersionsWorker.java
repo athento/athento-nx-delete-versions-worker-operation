@@ -31,15 +31,19 @@ public class DeleteVersionsWorker extends AbstractWork {
 	 * For version 1.0
 	 */
 	private static final long serialVersionUID = 8077878313385599097L;
+
 	public DeleteVersionsWorker(String id) {
 		super(id);
 	}
-	
+
 	public DeleteVersionsWorker(String _conditions, boolean _simulate) {
 		conditions = _conditions;
 		simulate = _simulate;
 	}
-	/* (non-Javadoc)
+
+	/*
+	 * (non-Javadoc)
+	 * 
 	 * @see org.nuxeo.ecm.core.work.api.Work#getTitle()
 	 */
 	@Override
@@ -47,48 +51,74 @@ public class DeleteVersionsWorker extends AbstractWork {
 		// TODO Auto-generated method stub
 		return getCategory() + " " + conditions;
 	}
+
 	@Override
 	public String getCategory() {
 		return CATEGORY;
 	}
-	/* (non-Javadoc)
+
+	/*
+	 * (non-Javadoc)
+	 * 
 	 * @see org.nuxeo.ecm.core.work.AbstractWork#work()
 	 */
 	@Override
 	public void work() throws Exception {
 		if (_log.isInfoEnabled()) {
-			_log.info("=== " + (simulate?"SIMULATING":"INITIALIZING") + " Work with query (" + conditions + ")");
+			_log.info("=== " + (simulate ? "SIMULATING" : "INITIALIZING")
+					+ " Work with query (" + conditions + ")");
 		}
 		List<DocumentModel> result = null;
 		initSession();
 		setProgress(new Progress(0));
 		try {
 			setStatus("Fetching results");
-			String NX_QUERY = DeleteVersionsWorker.QUERY_CHECKED_IN 
-				+ (conditions!=null?" AND " + conditions:"");
+			String NX_QUERY = DeleteVersionsWorker.QUERY_CHECKED_IN
+					+ (conditions != null && !conditions.isEmpty() ? " AND "
+							+ conditions : "");
+			if (_log.isInfoEnabled()) {
+				_log.info("Query for checked out documents: " + NX_QUERY);
+			}
+
 			long startTime = System.currentTimeMillis();
 			result = session.query(NX_QUERY);
 			long stopTime = System.currentTimeMillis();
 			long elapsedTime = stopTime - startTime;
-			setStatus("#" + result.size() + " results fetched in " + elapsedTime + " ms");
+			String msg = "#" + result.size() + " results fetched in "
+					+ elapsedTime + " ms";
+			setStatus(msg);
+			if (_log.isInfoEnabled()) {
+				_log.info(msg);
+			}
 			setProgress(new Progress(33));
 			if (result.size() > 0) {
-				setStatus("Checking out #"+ result.size() +" documents");
-				for (DocumentModel document: result) {
-					if (document.isCheckedOut()) {
+				setStatus("Checking out #" + result.size() + " documents");
+				for (DocumentModel document : result) {
+					boolean isCheckedOut = document.isCheckedOut();
+					if (_log.isInfoEnabled()) {
+						_log.info("Document [" + document.getId() + "|"
+								+ document.getPathAsString()
+								+ "] is checked out: " + isCheckedOut);
+					}
+					if (!isCheckedOut) {
 						if (_log.isInfoEnabled()) {
-							_log.info("Document [" + document.getPathAsString() + "] is checked out");
-						}
-						if (_log.isInfoEnabled()) {
-							_log.info(" checking out document [" + document.getPathAsString() + "]");
+							_log.info(" checking out document ["
+									+ document.getId() + "|"
+									+ document.getPathAsString() + "]");
 						}
 						if (!simulate) {
 							try {
 								document.checkOut();
+								if (_log.isInfoEnabled()) {
+									_log.info(" [ok] document ["
+											+ document.getId() + "|"
+											+ document.getPathAsString()
+											+ "] checked out");
+								}
 							} catch (Exception e) {
-								_log.error(" !! Unable to checkout document [" 
-									+ document.getPathAsString() + "]: " 
-									+ e.getMessage(),e);
+								_log.error(" !! Unable to checkout document ["
+										+ document.getPathAsString() + "]: "
+										+ e.getMessage(), e);
 							}
 						}
 					}
@@ -98,38 +128,51 @@ public class DeleteVersionsWorker extends AbstractWork {
 					commitOrRollbackTransaction();
 					startTransaction();
 				}
-				setProgress(new Progress(50));
-				setStatus("Searching versions");
-				NX_QUERY = DeleteVersionsWorker.QUERY_VERSIONS 
-					+ (conditions!=null?" AND " + conditions:"");
-				startTime = System.currentTimeMillis();
-				result = session.query(NX_QUERY);
-				stopTime = System.currentTimeMillis();
-				elapsedTime = stopTime - startTime;
-				setStatus("#" + result.size() + " results fetched in " + elapsedTime + " ms");
-				setProgress(new Progress(66));
-				if (result.size() > 0) {
-					setStatus("Deleting #"+ result.size() + " documents");
-					for (DocumentModel document: result) {
-						if (_log.isInfoEnabled()) {
-							_log.info(" deleting document [" + document.getPathAsString() + "]");
-						}
-						if (!simulate) {
-							try {
-								session.removeDocument(document.getRef());
-								if (_log.isInfoEnabled()) {
-									_log.info(" document deleted [" + document.getPathAsString() + "]");
-								}
-							} catch (Exception e) {
-								_log.error(" !! Unable to delete document [" 
-									+ document.getPathAsString() + "]: " 
-									+ e.getMessage(),e);
-							}
-						}
-					}
-				} else {
+			} else {
+				if (_log.isInfoEnabled()) {
+					_log.info(" 0 results found!");
+				}
+			}
+			setProgress(new Progress(50));
+			setStatus("Searching versions");
+			NX_QUERY = DeleteVersionsWorker.QUERY_VERSIONS
+					+ (conditions != null && !conditions.isEmpty() ? " AND "
+							+ conditions : "");
+			if (_log.isInfoEnabled()) {
+				_log.info("Query for deleting versions: " + NX_QUERY);
+			}
+			startTime = System.currentTimeMillis();
+			result = session.query(NX_QUERY);
+			stopTime = System.currentTimeMillis();
+			elapsedTime = stopTime - startTime;
+			msg = "#" + result.size() + " results fetched in " + elapsedTime
+					+ " ms";
+			setStatus(msg);
+			if (_log.isInfoEnabled()) {
+				_log.info(msg);
+			}
+			setProgress(new Progress(66));
+			if (result.size() > 0) {
+				setStatus("Deleting #" + result.size() + " documents");
+				for (DocumentModel document : result) {
 					if (_log.isInfoEnabled()) {
-						_log.info(" 0 results found!");
+						_log.info(" deleting document [" + document.getId()
+								+ "|" + document.getPathAsString() + "]");
+					}
+					if (!simulate) {
+						try {
+							session.removeDocument(document.getRef());
+							if (_log.isInfoEnabled()) {
+								_log.info(" [ok] document deleted ["
+										+ document.getId() + "|"
+										+ document.getPathAsString() + "]");
+							}
+						} catch (Exception e) {
+							_log.error(
+									" !! Unable to delete document ["
+											+ document.getPathAsString()
+											+ "]: " + e.getMessage(), e);
+						}
 					}
 				}
 			} else {
@@ -148,23 +191,24 @@ public class DeleteVersionsWorker extends AbstractWork {
 			_log.info("=== ENDING Work for query (" + conditions + ")");
 		}
 	}
+
 	private String conditions;
 	private boolean simulate;
 
 	private static final String QUERY_CHECKED_IN = "SELECT * FROM Document WHERE "
-		+ " ecm:currentLifeCycleState != 'deleted' AND "
-		+ " ecm:isVersion = 0 AND "
-		+ " ecm:mixinType != 'HiddenInNavigation' "
-		+ " AND "
-		+ " ecm:mixinType != 'Folderish' AND ecm:isCheckedIn = 1 ";
+			+ " ecm:currentLifeCycleState != 'deleted' AND "
+			+ " ecm:isVersion = 0 AND "
+			+ " ecm:mixinType != 'HiddenInNavigation' "
+			+ " AND "
+			+ " ecm:mixinType != 'Folderish' AND ecm:isCheckedIn = 1 ";
 	private static final String QUERY_VERSIONS = "SELECT * FROM Document WHERE "
-		+ " ecm:currentLifeCycleState != 'deleted' AND "
-		+ " ecm:isVersion = 1 AND "
-		+ " ecm:mixinType != 'HiddenInNavigation' "
-		+ " AND "
-		+ " ecm:mixinType != 'Folderish' ";
+			+ " ecm:currentLifeCycleState != 'deleted' AND "
+			+ " ecm:isVersion = 1 AND "
+			+ " ecm:mixinType != 'HiddenInNavigation' "
+			+ " AND "
+			+ " ecm:mixinType != 'Folderish' ";
 	private static final String CATEGORY = "DeleteVersions ";
-	private static final Log _log = LogFactory.getLog(DeleteVersionsWorker.class);
-
+	private static final Log _log = LogFactory
+			.getLog(DeleteVersionsWorker.class);
 
 }
