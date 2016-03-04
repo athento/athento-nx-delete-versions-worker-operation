@@ -1,0 +1,17 @@
+<assembly>
+	<artifactSet id="project-plugins">
+		<artifacts>
+<!--
+			<artifact group="org.athento.ADDON_NAME" name="org.athento.ADDON_NAME.PLUGIN_NAME"
+				version="PLUGIN_VERSION" />
+-->
+		</artifacts>
+	</artifactSet>
+	<artifactSet id="athento-plugins">
+		<artifacts>
+			<artifact group="org.athento.nuxeo.operations" name="athento-nx-delete-versions-worker-operation"
+				version="1.0" />
+		</artifacts>
+	</artifactSet>
+</assembly>
+

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<fragment version="1">
+	<extension target="application#MODULE">
+		<module>
+			<java>${bundle.fileName}</java>
+		</module>
+	</extension>
+	<require>all</require>
+	<install>
+		<delete path="${bundle.fileName}.tmp" />
+		<unzip from="${bundle.fileName}" to="/" prefix="web">
+			<include>**/*.properties</include>
+			<include>web/nuxeo.war/**</include>
+		</unzip>
+
+		<delete path="${bundle.fileName}.tmp" />
+	</install>
+</fragment>
