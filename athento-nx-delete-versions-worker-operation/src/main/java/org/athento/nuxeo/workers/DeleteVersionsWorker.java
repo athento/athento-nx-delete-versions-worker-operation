@@ -36,9 +36,10 @@ public class DeleteVersionsWorker extends AbstractWork {
 		super(id);
 	}
 
-	public DeleteVersionsWorker(String _conditions, boolean _simulate) {
+	public DeleteVersionsWorker(String _conditions, int _maxResults, boolean _simulate) {
 		conditions = _conditions;
 		simulate = _simulate;
+		max = _maxResults;
 	}
 
 	/*
@@ -66,34 +67,40 @@ public class DeleteVersionsWorker extends AbstractWork {
 	public void work() throws Exception {
 		if (_log.isInfoEnabled()) {
 			_log.info("=== " + (simulate ? "SIMULATING" : "INITIALIZING")
-					+ " Work with query (" + conditions + ")");
+				+ " Work with query (" + conditions + ")" 
+					+ (max>0?"(max: "+ max+")":""));
 		}
 		List<DocumentModel> result = null;
 		initSession();
-		setProgress(new Progress(0));
+		float percent = 0;
+		setProgress(new Progress(percent));
 		try {
-			setStatus("Fetching results");
+			inform("Fetching " + (max>0?"(max: "+ max+")":"") + " results ");
 			String NX_QUERY = DeleteVersionsWorker.QUERY_CHECKED_IN
-					+ (conditions != null && !conditions.isEmpty() ? " AND "
-							+ conditions : "");
+				+ (conditions != null && !conditions.isEmpty() ? " AND "
+					+ conditions : "");
 			if (_log.isInfoEnabled()) {
 				_log.info("Query for checked out documents: " + NX_QUERY);
 			}
-
 			long startTime = System.currentTimeMillis();
-			result = session.query(NX_QUERY);
+			if (max > 0) {
+				result = session.query(NX_QUERY, max);
+			} else {
+				result = session.query(NX_QUERY);
+			}
 			long stopTime = System.currentTimeMillis();
 			long elapsedTime = stopTime - startTime;
 			String msg = "#" + result.size() + " results fetched in "
 					+ elapsedTime + " ms";
-			setStatus(msg);
-			if (_log.isInfoEnabled()) {
-				_log.info(msg);
-			}
-			setProgress(new Progress(33));
+			inform(msg);
+			percent = 25;
+			setProgress(new Progress(percent));
 			if (result.size() > 0) {
-				setStatus("Checking out #" + result.size() + " documents");
+				float increment = 25 / result.size();
+				inform("Checking out #" + result.size() + " documents");
 				for (DocumentModel document : result) {
+					percent = percent + increment;
+					setProgress(new Progress(percent));
 					boolean isCheckedOut = document.isCheckedOut();
 					if (_log.isInfoEnabled()) {
 						_log.info("Document [" + document.getId() + "|"
@@ -123,42 +130,41 @@ public class DeleteVersionsWorker extends AbstractWork {
 						}
 					}
 				}
-				setStatus("Saving checked out documents");
+				inform("Saving checked out documents");
 				if (!simulate) {
 					commitOrRollbackTransaction();
 					startTransaction();
 				}
 			} else {
-				if (_log.isInfoEnabled()) {
-					_log.info(" 0 results found!");
-				}
+				inform(" 0 results found!");
 			}
 			setProgress(new Progress(50));
-			setStatus("Searching versions");
+			inform("Searching versions");
 			NX_QUERY = DeleteVersionsWorker.QUERY_VERSIONS
-					+ (conditions != null && !conditions.isEmpty() ? " AND "
-							+ conditions : "");
+				+ (conditions != null && !conditions.isEmpty() ? " AND "
+					+ conditions : "");
 			if (_log.isInfoEnabled()) {
 				_log.info("Query for deleting versions: " + NX_QUERY);
 			}
 			startTime = System.currentTimeMillis();
-			result = session.query(NX_QUERY);
+			if (max > 0) {
+				result = session.query(NX_QUERY, max);
+			} else {
+				result = session.query(NX_QUERY);
+			}
 			stopTime = System.currentTimeMillis();
 			elapsedTime = stopTime - startTime;
 			msg = "#" + result.size() + " results fetched in " + elapsedTime
 					+ " ms";
-			setStatus(msg);
-			if (_log.isInfoEnabled()) {
-				_log.info(msg);
-			}
-			setProgress(new Progress(66));
+			inform(msg);
+			setProgress(new Progress(75));
 			if (result.size() > 0) {
-				setStatus("Deleting #" + result.size() + " documents");
+				float increment = 25 / result.size();
+				setProgress(new Progress(increment));
+				inform("Deleting #" + result.size() + " documents");
 				for (DocumentModel document : result) {
-					if (_log.isInfoEnabled()) {
-						_log.info(" deleting document [" + document.getId()
-								+ "|" + document.getPathAsString() + "]");
-					}
+					inform(" deleting document [" + document.getId()
+						+ "|" + document.getPathAsString() + "]");
 					if (!simulate) {
 						try {
 							session.removeDocument(document.getRef());
@@ -169,16 +175,14 @@ public class DeleteVersionsWorker extends AbstractWork {
 							}
 						} catch (Exception e) {
 							_log.error(
-									" !! Unable to delete document ["
-											+ document.getPathAsString()
-											+ "]: " + e.getMessage(), e);
+								" !! Unable to delete document ["
+									+ document.getPathAsString()
+										+ "]: " + e.getMessage(), e);
 						}
 					}
 				}
 			} else {
-				if (_log.isInfoEnabled()) {
-					_log.info(" 0 results found!");
-				}
+				inform(" 0 results found!");
 			}
 		} finally {
 			if (!simulate) {
@@ -192,7 +196,15 @@ public class DeleteVersionsWorker extends AbstractWork {
 		}
 	}
 
+	private void inform (String msg) {
+		setStatus(msg);
+		if (_log.isInfoEnabled()) {
+			_log.info(msg);
+		}
+	}
+	
 	private String conditions;
+	private int max;
 	private boolean simulate;
 
 	private static final String QUERY_CHECKED_IN = "SELECT * FROM Document WHERE "

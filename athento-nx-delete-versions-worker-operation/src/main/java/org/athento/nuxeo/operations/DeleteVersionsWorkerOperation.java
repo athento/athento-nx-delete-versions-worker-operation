@@ -41,11 +41,14 @@ public class DeleteVersionsWorkerOperation {
 	@Context
 	protected CoreSession session;
 
-	@Param(name = "conditions")
+	@Param(name = "conditions", required = false)
 	protected String conditions;
 
 	@Param(name = "simulate", required = false, values = "true")
 	boolean simulate = true;
+
+	@Param(name = "max", required = false)
+	private int max = 0;
 
 	@OperationMethod
 	public String run() throws Exception {
@@ -57,7 +60,7 @@ public class DeleteVersionsWorkerOperation {
 		if (_log.isInfoEnabled()) {
 			_log.info("Launching worker...");
 		}
-		DeleteVersionsWorker work = new DeleteVersionsWorker(conditions, simulate);
+		DeleteVersionsWorker work = new DeleteVersionsWorker(conditions, max, simulate);
 		WorkManager workManager = Framework.getLocalService(WorkManager.class);
 		workManager.schedule(work, WorkManager.Scheduling.IF_NOT_RUNNING_OR_SCHEDULED);
 		String workId = work.getId();
