@@ -1,5 +1,5 @@
 <?xml version="1.0"?>
-<component 	name="org.athento.nuxeo.operations.SetACEWorkerOperation"
+<component 	name="org.athento.nuxeo.operations.DeleteVersionsWorkerOperation"
 	version="1.0.0">
 	<!-- Contributing a new operation to be used for import some files -->
 	<extension target="org.nuxeo.ecm.core.operation.OperationServiceComponent"
